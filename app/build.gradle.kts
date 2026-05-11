@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

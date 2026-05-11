@@ -10,7 +10,7 @@ data class Deadline(
     val endDate: Long,
     val priority: Int,
     val isExtended: Boolean = false
-)fg
+)
 
 
 @Entity(tableName = "sub_tasks")

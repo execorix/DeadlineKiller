@@ -10,10 +10,9 @@ import androidx.room.PrimaryKey
 data class Deadline(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
-    val description: String?,
-    val startDate: Long,
+    val description: String,
     val endDate: Long,
     val priority: Int,
-    val isCompleted: Boolean = false,
-    val isExtended: Boolean = false
+    val category: String = "Все дедлайны",
+    val isCompleted: Boolean = false
 )

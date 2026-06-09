@@ -28,9 +28,13 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
         private set
     var endDate by mutableStateOf(System.currentTimeMillis())
         private set
-
-    // Переменная для текста ошибки валидации
     var validationError by mutableStateOf<String?>(null)
+        private set
+    var category by mutableStateOf("Все дедлайны")
+        private set
+    var priority by mutableStateOf(1)
+        private set
+    var isCompleted by mutableStateOf(false)
         private set
 
     private var currentDeadlineId: Int = 0
@@ -39,30 +43,27 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
     var newSubTaskText by mutableStateOf("")
         private set
 
-    // Стейт-поток, хранящий текущий ID открытого дедлайна
     private val _currentDeadlineId = MutableStateFlow(0)
 
-    // Поток, который автоматически подгружает подзадачи при изменении ID дедлайна
     val subTasksFlow: Flow<List<SubTask>> = _currentDeadlineId.flatMapLatest { id ->
         repository.getSubTasks(id)
     }
 
     fun onTitleChange(newTitle: String) { title = newTitle }
     fun onDescriptionChange(newDesc: String) { description = newDesc }
-
     fun onNewSubTaskTextChange(text: String) { newSubTaskText = text }
-
+    fun setDeadlinePriority(value: Int) { priority = value }
 
     fun onDateChange(newDate: Long) {
         endDate = newDate
-        validationError = null // Сбрасываем ошибку, если пользователь выбирает другое время
+        validationError = null
     }
 
     fun loadDeadline(id: Int) {
         if (id <= 0) return
         currentDeadlineId = id
         isEditMode = true
-        _currentDeadlineId.value = id // Триггерим загрузку мини-тасков для этого ID
+        _currentDeadlineId.value = id
 
         viewModelScope.launch {
             repository.getDeadlineById(id).collect { deadline ->
@@ -70,11 +71,29 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
                     title = it.title
                     description = it.description ?: ""
                     endDate = it.endDate
+                    priority = it.priority
+                    isCompleted = it.isCompleted
                 }
             }
         }
     }
 
+    // Быстрое переключение выполнения дедлайна из нижнего блока
+    fun toggleDeadlineCompletion() {
+        if (currentDeadlineId <= 0 && !isEditMode) return
+        isCompleted = !isCompleted
+        viewModelScope.launch {
+            val currentDeadline = Deadline(
+                id = currentDeadlineId,
+                title = title,
+                description = description,
+                endDate = endDate,
+                priority = priority,
+                isCompleted = isCompleted,
+            )
+            repository.updateDeadline(currentDeadline)
+        }
+    }
 
     fun addSubTask() {
         if (newSubTaskText.isBlank() || currentDeadlineId <= 0) return
@@ -86,24 +105,25 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
                 isCompleted = false
             )
             repository.insertSubTask(subTask)
-            newSubTaskText = "" // Очищаем поле ввода
+            newSubTaskText = ""
         }
     }
 
-    // Переключение чекбокса мини-задачи
     fun toggleSubTaskCompletion(subTask: SubTask) {
         viewModelScope.launch {
             repository.updateSubTask(subTask.copy(isCompleted = !subTask.isCompleted))
         }
     }
 
-    // Удаление мини-задачи крестиком
     fun deleteSubTask(subTask: SubTask) {
         viewModelScope.launch {
             repository.deleteSubTask(subTask)
         }
     }
 
+    fun onCategoryChange(newCategory: String) {
+        category = newCategory
+    }
 
     fun saveDeadline(context: Context, onSuccess: () -> Unit) {
         if (title.isBlank()) {
@@ -123,15 +143,12 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
             val deadline = Deadline(
                 id = if (isEditMode) currentDeadlineId else 0,
                 title = title,
-                description = description.ifBlank { null },
-                startDate = currentTime,
+                description = description,
                 endDate = endDate,
-                priority = 1,
-                isCompleted = false,
-                isExtended = false
+                priority = priority,
+                isCompleted = isCompleted,
             )
 
-            // Сохраняем или обновляем дедлайн в БД и получаем его ID
             val savedId = if (isEditMode) {
                 repository.updateDeadline(deadline)
                 currentDeadlineId
@@ -169,7 +186,6 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
                     val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
                         .setInputData(inputData)
                         .setInitialDelay(delayInSeconds, TimeUnit.SECONDS)
-                        // Вешаем один тег на все уведомления этой задачи, чтобы их можно было скопом отменить
                         .addTag("deadline_$savedId")
                         .build()
 
@@ -179,6 +195,5 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
 
             onSuccess()
         }
-
     }
 }

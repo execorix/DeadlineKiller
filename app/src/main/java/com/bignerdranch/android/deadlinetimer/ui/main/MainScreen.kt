@@ -2,8 +2,11 @@ package com.bignerdranch.android.deadlinetimer.ui.main
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.items
@@ -16,7 +19,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -29,7 +36,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -38,24 +48,39 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bignerdranch.android.deadlinetimer.data.local.entities.Deadline
+import com.bignerdranch.android.deadlinetimer.ui.theme.AccentPrimary
+import com.bignerdranch.android.deadlinetimer.ui.theme.BackgroundDark
+import com.bignerdranch.android.deadlinetimer.ui.theme.SurfaceDark
+import com.bignerdranch.android.deadlinetimer.ui.theme.TextPrimary
+import com.bignerdranch.android.deadlinetimer.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.bignerdranch.android.deadlinetimer.R
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,52 +88,76 @@ import java.time.format.DateTimeFormatter
 fun MainScreen(
     viewModel: MainViewModel,
     onAddDeadlineClick: () -> Unit,
-    onDeadlineClick: (Int) -> Unit
+    onDeadlineClick: (Int) -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToCompleted: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    // Получаем данные из БД (здесь должен быть ваш State/Flow с дедлайнами, например коллекция через collectAsState)
-    val deadlines by viewModel.deadlinesFlow.collectAsState(initial = emptyList())
+    val deadlines by viewModel.deadlines.collectAsState()
+    val currentSortType by viewModel.sortType.collectAsState()
+    val currentCategory by viewModel.selectedCategory.collectAsState()
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var showSortMenu by remember { mutableStateOf(false) }
 
-    // Наш Сайдбар (ModalNavigationDrawer)
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                drawerContainerColor = SurfaceDark,
+                drawerContentColor = TextPrimary
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween // Разносит контент и лого на края как в эскизе
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Верхняя часть сайдбара
                     Column {
                         Text(
                             text = "Deadline Timer",
-                            fontSize = 22.sp,
-                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentPrimary,
                             modifier = Modifier.padding(bottom = 24.dp)
                         )
-                        HorizontalDivider()
+                        HorizontalDivider(color = Color(0xFF2D2D34))
 
-                        // Кнопка "Выбрать"
                         NavigationDrawerItem(
-                            label = { Text("Выбрать задачи") },
+                            label = { Text("Выбрать задачи", color = TextPrimary) },
                             selected = viewModel.isSelectionMode.value,
                             onClick = {
                                 viewModel.toggleSelectionMode()
                                 scope.launch { drawerState.close() }
-                            }
-                        )
-                        NavigationDrawerItem(
-                            label = {
-                                Text(if (viewModel.isDarkTheme.value) "Светлая тема" else "Тёмная тема")
                             },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedContainerColor = Color.Transparent,
+                                selectedContainerColor = AccentPrimary.copy(alpha = 0.2f)
+                            ),
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Выполненные дедлайны", color = TextPrimary) },
                             selected = false,
                             onClick = {
-                                viewModel.toggleTheme()
-                            }
+                                scope.launch { drawerState.close() }
+                                onNavigateToCompleted()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Профиль и статистика", color = TextPrimary) },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onNavigateToProfile()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
 
@@ -119,33 +168,44 @@ fun MainScreen(
                         Text(
                             text = "v1.0 • Kolbeshkin K.A.",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = TextSecondary
                         )
                     }
                 }
             }
         }
     ) {
-        // Основной контент экрана
         Scaffold(
+            containerColor = BackgroundDark,
             topBar = {
-                // Динамический TopAppBar: меняется в зависимости от режима выбора
                 TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = BackgroundDark,
+                        titleContentColor = TextPrimary,
+                        navigationIconContentColor = TextPrimary
+                    ),
                     title = {
-                        if (viewModel.isSelectionMode.value) {
-                            Text("Выбрано: ${viewModel.selectedDeadlineIds.size}")
-                        } else {
-                            Text("Мои Дедлайны")
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            if (viewModel.isSelectionMode.value) {
+                                Text("Выбрано: ${viewModel.selectedDeadlineIds.size}", fontWeight = FontWeight.SemiBold)
+                            } else {
+                                // Добавляем ic_logo.png по центру как в макете image_373d82.png
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_logo),
+                                    contentDescription = "Логотип",
+                                    modifier = Modifier
+                                        .size(100.dp, 36.dp)
+                                        .align(Alignment.Center)
+                                )
+                            }
                         }
                     },
                     navigationIcon = {
                         if (viewModel.isSelectionMode.value) {
-                            // Кнопка отмены выбора (крестик)
                             IconButton(onClick = { viewModel.toggleSelectionMode() }) {
                                 Icon(Icons.Default.Close, contentDescription = "Закрыть")
                             }
                         } else {
-                            // Обычный бургер-меню для открытия сайдбара
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Меню")
                             }
@@ -154,55 +214,193 @@ fun MainScreen(
                     actions = {
                         if (viewModel.isSelectionMode.value && viewModel.selectedDeadlineIds.isNotEmpty()) {
                             IconButton(onClick = { viewModel.deleteSelectedDeadlines(deadlines) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить выбранное", tint = Color.Red)
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = Color(0xFFEF4444))
                             }
+                        } else {
+                            // Пустой Box справа для балансировки центрирования логотипы
+                            Spacer(modifier = Modifier.width(48.dp))
                         }
                     }
                 )
             },
             floatingActionButton = {
-                // Скрываем кнопку плюса в режиме выбора задач, чтобы не мешала
                 if (!viewModel.isSelectionMode.value) {
-                    FloatingActionButton(onClick = onAddDeadlineClick) {
-                        Text("+", fontSize = 24.sp)
+                    FloatingActionButton(
+                        onClick = onAddDeadlineClick,
+                        containerColor = AccentPrimary,
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Text("+", fontSize = 26.sp, fontWeight = FontWeight.Light)
                     }
                 }
             }
         ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier.padding(paddingValues),
-                contentPadding = PaddingValues(bottom = 80.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                items(deadlines) { deadline ->
-                    val isSelected = viewModel.selectedDeadlineIds.contains(deadline.id)
+                if (!viewModel.isSelectionMode.value) {
+                    // 1. Категории дедлайнов (Верхний скролл-бар из макета)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val categories = listOf("Все дедлайны", "Категория 1", "Учеба", "Работа")
+                        categories.forEach { category ->
+                            val isCatSelected = currentCategory == category
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isCatSelected) AccentPrimary.copy(alpha = 0.15f) else SurfaceDark)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isCatSelected) AccentPrimary else Color(0xFF2D2D34),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { viewModel.changeCategory(category) }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = category,
+                                    color = if (isCatSelected) AccentPrimary else TextSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
 
-                    // Обертка для обработки кликов по карточке
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        // Наша карточка дедлайна
-                        DeadlineItem(
-                            deadline = deadline,
-                            onClick = {
+                    // 2. Единая минималистичная выпадающая кнопка сортировки из макета
+                    val sortLabel = when (currentSortType) {
+                        DeadlineSortType.BY_DATE -> "по дате сдачи"
+                        DeadlineSortType.BY_PRIORITY -> "по важности"
+                        DeadlineSortType.BY_ALPHABET -> "по алфавиту"
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SurfaceDark)
+                                .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
+                                .clickable { showSortMenu = true }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Сортировка: $sortLabel",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text("▼", color = TextSecondary, fontSize = 10.sp)
+                        }
+
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false },
+                            modifier = Modifier
+                                .background(SurfaceDark)
+                                .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("По дате сдачи", color = TextPrimary) },
+                                onClick = {
+                                    viewModel.changeSortType(DeadlineSortType.BY_DATE)
+                                    showSortMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("По важности", color = TextPrimary) },
+                                onClick = {
+                                    viewModel.changeSortType(DeadlineSortType.BY_PRIORITY)
+                                    showSortMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("По алфавиту", color = TextPrimary) },
+                                onClick = {
+                                    viewModel.changeSortType(DeadlineSortType.BY_ALPHABET)
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Список элементов
+                if (deadlines.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Нет активных дедлайнов",
+                            fontSize = 15.sp,
+                            color = TextSecondary
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(deadlines, key = { it.id }) { deadline ->
+                            val isSelected = viewModel.selectedDeadlineIds.contains(deadline.id)
+
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                DeadlineItem(
+                                    deadline = deadline,
+                                    onClick = {
+                                        if (viewModel.isSelectionMode.value) {
+                                            viewModel.toggleDeadlineSelection(deadline.id)
+                                        } else {
+                                            onDeadlineClick(deadline.id)
+                                        }
+                                    }
+                                )
+
+                                // Наш кастомный чекбокс-ромбик/квадрат для режима выделения
                                 if (viewModel.isSelectionMode.value) {
-                                    viewModel.toggleDeadlineSelection(deadline.id)
-                                } else {
-                                    onDeadlineClick(deadline.id)
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 16.dp)
+                                            .size(24.dp)
+                                            .border(
+                                                width = 1.5.dp,
+                                                color = if (isSelected) AccentPrimary else TextSecondary,
+                                                shape = RoundedCornerShape(6.dp)
+                                            )
+                                            .background(if (isSelected) AccentPrimary else Color.Transparent)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { viewModel.toggleDeadlineSelection(deadline.id) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        )
-
-                        if (viewModel.isSelectionMode.value) {
-                            Checkbox(
-                                checked = isSelected,
-                                onCheckedChange = { viewModel.toggleDeadlineSelection(deadline.id) },
-                                // Модификатор отвечает ТОЛЬКО за выравнивание и отступы
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .padding(end = 24.dp),
-                                // Параметр colors идёт ОТДЕЛЬНО, после модификатора
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = MaterialTheme.colorScheme.primary
-                                )
-                            )
                         }
                     }
                 }
@@ -218,38 +416,77 @@ fun DeadlineItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Неоновые цвета границ по важности (Вместо бьющих по глазам фонов)
+    val borderColor = when (deadline.priority) {
+        3 -> Color(0xFFEF4444) // Высокая - Красный
+        2 -> Color(0xFFFBBF24) // Средняя - Желтый
+        else -> Color(0xFF10B981) // Низкая - Зеленый
+    }
+
+    val priorityText = when (deadline.priority) {
+        3 -> "Важно"
+        2 -> "Средне"
+        else -> "Низкая"
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp, horizontal = 8.dp)
-            .clickable { onClick() }
-            .border(2.dp, Color.Black, RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+            .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
+            modifier = Modifier.padding(16.dp).fillMaxWidth()
         ) {
-            Text(
-                text = "${deadline.id}) ${deadline.title}",
-                fontSize = 18.sp,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.Black
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // Имя дедлайна
+                Text(
+                    text = deadline.title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Метка важности со своим индикатором-цветом
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(8.dp)
+                            .background(borderColor, CircleShape)
+                    )
+                    Text(
+                        text = priorityText,
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Время контента
             Text(
                 text = formatRemainingTime(deadline.endDate),
-                fontSize = 14.sp,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.DarkGray
+                fontSize = 13.sp,
+                color = if (deadline.endDate - System.currentTimeMillis() < 3600000 * 12) Color(0xFFEF4444) else TextSecondary,
+                fontWeight = FontWeight.Normal
             )
         }
     }
 }
+
 fun formatRemainingTime(endDateTimestamp: Long): String {
     val currentTime = System.currentTimeMillis()
     val remainingMillis = endDateTimestamp - currentTime
@@ -263,14 +500,8 @@ fun formatRemainingTime(endDateTimestamp: Long): String {
     val totalDays = totalHours / 24
 
     return when {
-        totalHours < 1 -> {
-            "осталось времени: $totalMinutes мин."
-        }
-        totalDays < 1 -> {
-            "осталось времени: $totalHours ч."
-        }
-        else -> {
-            "осталось времени: $totalDays дн."
-        }
+        totalHours < 1 -> "времени осталось: $totalMinutes минут(ы)"
+        totalDays < 1 -> "времени осталось: $totalHours часов"
+        else -> "времени осталось: $totalDays дней"
     }
 }

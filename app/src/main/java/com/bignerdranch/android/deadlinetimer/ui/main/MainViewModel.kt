@@ -6,24 +6,63 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bignerdranch.android.deadlinetimer.data.local.entities.Deadline
 import com.bignerdranch.android.deadlinetimer.data.repository.DeadlineRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.collections.filter
 
+
 class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
-    var isDarkTheme = mutableStateOf(false)
-        private set
+
     val deadlinesFlow = repository.allDeadline
+
     var isSelectionMode = mutableStateOf(false)
         private set
 
     var selectedDeadlineIds = mutableStateListOf<Int>()
         private set
 
-    fun toggleTheme() {
-        isDarkTheme.value = !isDarkTheme.value
+    val sortType = MutableStateFlow(DeadlineSortType.BY_DATE)
+
+    // Текущая выбранная категория (пока заглушка для верстки)
+    val selectedCategory = MutableStateFlow("Все дедлайны")
+
+    // Фильтруем только НЕвыполненные дедлайны и сортируем их
+    val deadlines: StateFlow<List<Deadline>> = combine(
+        deadlinesFlow,
+        sortType,
+        selectedCategory // Наш MutableStateFlow("Все дедлайны")
+    ) { deadlinesList, type, category ->
+        // Сначала отсекаем выполненные
+        var filteredList = deadlinesList.filter { !it.isCompleted }
+
+        // Затем фильтруем по выбранной категории (если выбрано не "Все дедлайны")
+        if (category != "Все дедлайны") {
+            filteredList = filteredList.filter { it.category == category }
+        }
+
+        // В конце применяем сортировку
+        when (type) {
+            DeadlineSortType.BY_DATE -> filteredList.sortedBy { it.endDate }
+            DeadlineSortType.BY_PRIORITY -> filteredList.sortedByDescending { it.priority }
+            DeadlineSortType.BY_ALPHABET -> filteredList.sortedBy { it.title.lowercase() }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    fun changeSortType(type: DeadlineSortType) {
+        sortType.value = type
+    }
+
+    fun changeCategory(category: String) {
+        selectedCategory.value = category
     }
 
     fun toggleSelectionMode() {
@@ -44,43 +83,14 @@ class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
     fun deleteSelectedDeadlines(allDeadlines: List<Deadline>) {
         viewModelScope.launch {
             val toDelete = allDeadlines.filter { selectedDeadlineIds.contains(it.id) }
-
             toDelete.forEach { deadline ->
                 repository.deleteDeadline(deadline)
             }
             selectedDeadlineIds.clear()
             isSelectionMode.value = false
 
-            // Наш прошлый код сброса автоинкремента, если всё пусто
             if (repository.getDeadlinesCount() == 0) {
                 repository.resetIdSequence()
-            }
-        }
-    }
-    val deadlinesState: StateFlow<List<Deadline>> = repository.allDeadline
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun deleteDeadline(deadline: Deadline) {
-        viewModelScope.launch {
-            // 1. Удаляем сам дедлайн из базы
-            repository.deleteDeadline(deadline)
-
-            // 2. Проверяем, сколько дедлайнов осталось в таблице
-            val remainingCount = repository.getDeadlinesCount()
-
-            // 3. Если список пуст — сбрасываем историю ID в ноль
-            if (remainingCount == 0) {
-                repository.resetIdSequence()
-            }
-        }
-    fun toggleDeadlineCompletion(deadline: Deadline) {
-        viewModelScope.launch {
-            val updatedDeadline = deadline.copy(isCompleted = !deadline.isCompleted)
-            repository.updateDeadline(updatedDeadline)
             }
         }
     }

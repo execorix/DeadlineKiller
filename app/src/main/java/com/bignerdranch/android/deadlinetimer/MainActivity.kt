@@ -36,6 +36,8 @@ import com.bignerdranch.android.deadlinetimer.ui.details.DetailsViewModel
 import com.bignerdranch.android.deadlinetimer.ui.main.MainScreen
 
 import com.bignerdranch.android.deadlinetimer.ui.main.MainViewModel
+import com.bignerdranch.android.deadlinetimer.ui.profile.ProfileScreen
+import com.bignerdranch.android.deadlinetimer.ui.profile.ProfileViewModel
 import com.bignerdranch.android.deadlinetimer.ui.theme.DeadlineTimerTheme
 import kotlin.getValue
 import kotlin.jvm.java
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("ComposableDestinationInComposeScope")
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,17 +80,17 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            DeadlineTimerTheme(darkTheme = mainViewModel.isDarkTheme.value) {
+            DeadlineTimerTheme(darkTheme = true) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background // или Color(0xFF121214)
                 ) {
                     val navController = rememberNavController()
                     NavHost(
                         navController = navController,
                         startDestination = "main_screen"
                     ) {
-                        // Главный экран
+                        // 1. Главный экран дедлайнов
                         composable(route = "main_screen") {
                             val mainViewModel: MainViewModel = viewModel(
                                 factory = object : ViewModelProvider.Factory {
@@ -104,6 +107,11 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onDeadlineClick = { deadlineId ->
                                     navController.navigate("details_screen/$deadlineId")
+                                },
+                                onNavigateToProfile = {
+                                    navController.navigate("profile_screen")
+                                },
+                                onNavigateToCompleted = {
                                 }
                             )
                         }
@@ -132,11 +140,35 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+
+                        composable(route = "profile_screen") {
+                            val profileViewModel: ProfileViewModel = viewModel(
+                                factory = object : ViewModelProvider.Factory {
+                                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                        return ProfileViewModel(
+                                            repository,
+                                            applicationContext
+                                        ) as T
+                                    }
+                                }
+                            )
+
+                                ProfileScreen(
+                                    viewModel = profileViewModel,
+                                    onNavigateToMain = {
+                                        navController.navigate("main_screen") {
+                                            popUpTo("main_screen") { inclusive = true }
+                                        }
+                                    },
+                                    onNavigateToProfile = {}
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
-}
+
 
 

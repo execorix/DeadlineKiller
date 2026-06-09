@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -90,20 +91,20 @@ private val ColorActive = Color(0xFFEF4444)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
-    onNavigateToMain: () -> Unit,
-    onNavigateToProfile: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
+
     val userName by viewModel.userName.collectAsState()
+    val context = LocalContext.current
+    val userEmail by viewModel.userEmail.collectAsState()
     val avatarPath by viewModel.avatarUri.collectAsState()
     val stats by viewModel.statsFlow.collectAsState()
 
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-
-    var showEditDialog by remember { mutableStateOf(false) }
-    var inputName by remember { mutableStateOf("") }
-
+    // ВЫБОР ФОТОГРАФИИ
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -122,139 +123,99 @@ fun ProfileScreen(
         if (isGranted) photoPickerLauncher.launch("image/*")
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = SurfaceDark,
-                drawerContentColor = TextPrimary
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxHeight().padding(24.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Deadline Timer",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentPrimary,
-                            modifier = Modifier.padding(bottom = 24.dp)
-                        )
-                        HorizontalDivider(color = Color(0xFF2D2D34))
-
-                        NavigationDrawerItem(
-                            label = { Text("Мои Дедлайны", fontWeight = FontWeight.Medium) },
-                            selected = false,
-                            colors = NavigationDrawerItemDefaults.colors(
-                                unselectedContainerColor = Color.Transparent,
-                                unselectedTextColor = TextSecondary
-                            ),
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                onNavigateToMain()
-                            },
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
-                        NavigationDrawerItem(
-                            label = { Text("Профиль и статистика", fontWeight = FontWeight.Medium) },
-                            selected = true,
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = AccentPrimary.copy(alpha = 0.15f),
-                                selectedTextColor = AccentPrimary
-                            ),
-                            onClick = { scope.launch { drawerState.close() } },
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("v1.0 • Kolbeshkin K.A.", fontSize = 12.sp, color = TextSecondary)
-                    }
-                }
-            }
-        }
-    ) {
-        Scaffold(
-            containerColor = BackgroundDark, // Задаем общий темный фон экрана
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = BackgroundDark,
-                        navigationIconContentColor = TextPrimary
-                    ),
-                    title = {
+    Scaffold(
+        containerColor = BackgroundDark,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark,
+                    titleContentColor = TextPrimary
+                ),
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(end = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_logo),
                             contentDescription = "Логотип",
                             modifier = Modifier.height(50.dp).padding(bottom = 8.dp)
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Меню", modifier = Modifier.size(26.dp))
-                        }
                     }
-                )
-            }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Блок аватарки с неоновым эффектом границы
-                Box(
-                    modifier = Modifier
-                        .size(124.dp)
-                        .shadow(8.dp, CircleShape, ambientColor = AccentPrimary, spotColor = AccentPrimary)
-                        .clip(CircleShape)
-                        .background(SurfaceDark)
-                        .border(2.dp, AccentPrimary, CircleShape)
-                        .clickable {
-                            val hasPermission = ContextCompat.checkSelfPermission(
-                                context, permissionToRequest
-                            ) == PackageManager.PERMISSION_GRANTED
-
-                            if (hasPermission) {
-                                photoPickerLauncher.launch("image/*")
-                            } else {
-                                permissionLauncher.launch(permissionToRequest)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!avatarPath.isNullOrEmpty()) {
-                        Image(
-                            painter = rememberAsyncImagePainter(File(avatarPath!!)),
-                            contentDescription = "Аватарка профиля",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                },
+                actions = {
+                    IconButton(onClick = { onNavigateToSettings() }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_settings),
+                            contentDescription = "Настройки",
+                            tint = TextPrimary
                         )
-                    } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Добавить", fontSize = 12.sp, color = TextSecondary, textAlign = TextAlign.Center)
-                        }
                     }
                 }
+            )
+        },
+        modifier = modifier
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+            // АВАТАРКА ПРОФИЛЯ
+            Box(
+                modifier = Modifier
+                    .size(124.dp)
+                    .shadow(8.dp, CircleShape, ambientColor = AccentPrimary, spotColor = AccentPrimary)
+                    .clip(CircleShape)
+                    .background(SurfaceDark)
+                    .border(2.dp, AccentPrimary, CircleShape)
+                    .clickable {
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context, permissionToRequest
+                        ) == PackageManager.PERMISSION_GRANTED
 
-                // Красивое поле с именем
+                        if (hasPermission) {
+                            photoPickerLauncher.launch("image/*")
+                        } else {
+                            permissionLauncher.launch(permissionToRequest)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!avatarPath.isNullOrEmpty()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(File(avatarPath!!)),
+                        contentDescription = "Аватарка профиля",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }  else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_person),
+                        contentDescription = "Дефолтная аватарка",
+                        modifier = Modifier.fillMaxSize(0.6f),
+                        tint = TextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // БЛОК ИМЕНИ И ПОЧТЫ (Клик теперь переносит в полноценные настройки)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onNavigateToSettings() } // Просто открываем экран настроек
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            inputName = userName
-                            showEditDialog = true
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Text(
                         text = userName,
@@ -265,152 +226,107 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Редактировать имя",
+                        contentDescription = "Редактировать профиль",
                         modifier = Modifier.size(18.dp),
                         tint = AccentPrimary
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Карточка статистики (Dashboard Card)
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(24.dp)),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                Text(
+                    text = userEmail.ifBlank { "Почта не указана" },
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // КАРТОЧКА СТАТИСТИКИ (Твой Pie Chart)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(4.dp, RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Text(
+                        text = "Статистика дедлайнов",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Box(
+                        modifier = Modifier.size(160.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Статистика дедлайнов",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val total = stats.completedCount + stats.activeCount
+                            if (total == 0) {
+                                drawCircle(color = Color(0xFF2D2D34), style = Stroke(width = 24.dp.toPx()))
+                            } else {
+                                val completedSweep = (stats.completedCount.toFloat() / total.toFloat()) * 360f
+                                val activeSweep = 360f - completedSweep
 
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Плавный Pie Chart
-                        Box(
-                            modifier = Modifier.size(160.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val total = stats.completedCount + stats.activeCount
-                                if (total == 0) {
-                                    drawCircle(color = Color(0xFF2D2D34), style = Stroke(width = 24.dp.toPx()))
-                                } else {
-                                    val completedSweep = (stats.completedCount.toFloat() / total.toFloat()) * 360f
-                                    val activeSweep = 360f - completedSweep
-
-                                    // Готово
-                                    drawArc(
-                                        color = ColorCompleted,
-                                        startAngle = -90f,
-                                        sweepAngle = completedSweep,
-                                        useCenter = false,
-                                        style = Stroke(width = 24.dp.toPx())
-                                    )
-                                    // Активно
-                                    drawArc(
-                                        color = ColorActive,
-                                        startAngle = -90f + completedSweep,
-                                        sweepAngle = activeSweep,
-                                        useCenter = false,
-                                        style = Stroke(width = 24.dp.toPx())
-                                    )
-                                }
-                            }
-
-                            // Текст в центре
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${stats.completedPercentage.toInt()}%",
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                drawArc(
+                                    color = ColorCompleted,
+                                    startAngle = -90f,
+                                    sweepAngle = completedSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = 24.dp.toPx())
                                 )
-                                Text(
-                                    text = "Успешно",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
+                                drawArc(
+                                    color = ColorActive,
+                                    startAngle = -90f + completedSweep,
+                                    sweepAngle = activeSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = 24.dp.toPx())
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(28.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${stats.completedPercentage.toInt()}%",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Успешно",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
 
-                        // Индикаторы данных (Легенда)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(ColorCompleted))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Выполнено: ${stats.completedCount}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(ColorActive))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("В процессе: ${stats.activeCount}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            }
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(ColorCompleted))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Выполнено: ${stats.completedCount}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(ColorActive))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("В процессе: ${stats.activeCount}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             }
         }
-    }
-
-    // Стилизованный темный диалог редактирования имени
-    if (showEditDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false },
-            containerColor = SurfaceDark,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
-            title = { Text("Изменить имя", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = inputName,
-                    onValueChange = { inputName = it },
-                    label = { Text("Ваше имя") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AccentPrimary,
-                        unfocusedBorderColor = Color(0xFF2D2D34),
-                        focusedLabelColor = AccentPrimary,
-                        unfocusedLabelColor = TextSecondary,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (inputName.isNotBlank()) {
-                            viewModel.updateProfile(context, inputName, null)
-                        }
-                        showEditDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
-                ) {
-                    Text("Сохранить", color = Color.White, fontWeight = FontWeight.SemiBold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditDialog = false }) {
-                    Text("Отмена", color = TextSecondary)
-                }
-            }
-        )
     }
 }

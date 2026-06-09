@@ -3,7 +3,9 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
+import com.bignerdranch.android.deadlinetimer.data.local.entities.Category
 import com.bignerdranch.android.deadlinetimer.data.local.entities.Deadline
 import com.bignerdranch.android.deadlinetimer.data.local.entities.SubTask
 import kotlinx.coroutines.flow.Flow
@@ -43,4 +45,29 @@ interface DeadlineDao {
 
     @Delete
     suspend fun deleteSubTask(subTask: SubTask)
+
+    @Query("SELECT * FROM categories")
+    fun getAllCategories(): Flow<List<Category>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategory(category: Category)
+
+    @Delete
+    suspend fun deleteCategory(category: Category)
+
+    @Query("SELECT COUNT(*) FROM deadlines WHERE isCompleted = 0")
+    suspend fun getActiveDeadlinesCount(): Int
+
+    @Query("UPDATE deadlines SET category = 'Все дедлайны' WHERE category = :categoryName")
+    suspend fun resetDeadlinesCategory(categoryName: String)
+
+    @Query("DELETE FROM categories WHERE name = :categoryName")
+    suspend fun deleteCategoryByName(categoryName: String)
+
+    // Объединяем оба действия в безопасную транзакцию
+    @Transaction
+    suspend fun deleteCategoryAndResetDeadlines(categoryName: String) {
+        resetDeadlinesCategory(categoryName)
+        deleteCategoryByName(categoryName)
+    }
 }

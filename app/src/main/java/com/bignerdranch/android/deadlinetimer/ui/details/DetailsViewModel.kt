@@ -16,7 +16,11 @@ import com.bignerdranch.android.deadlinetimer.data.repository.DeadlineRepository
 import com.bignerdranch.android.deadlinetimer.worker.NotificationWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -24,12 +28,14 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
 
     var title by mutableStateOf("")
         private set
+
+    var validationError by mutableStateOf<String?>(null)
+        private set
     var description by mutableStateOf("")
         private set
     var endDate by mutableStateOf(System.currentTimeMillis())
         private set
-    var validationError by mutableStateOf<String?>(null)
-        private set
+
     var category by mutableStateOf("Все дедлайны")
         private set
     var priority by mutableStateOf(1)
@@ -43,13 +49,17 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
     var newSubTaskText by mutableStateOf("")
         private set
 
+
+
     private val _currentDeadlineId = MutableStateFlow(0)
 
     val subTasksFlow: Flow<List<SubTask>> = _currentDeadlineId.flatMapLatest { id ->
         repository.getSubTasks(id)
     }
+    val availableCategories: StateFlow<List<String>> = repository.allCategories
+        .map { list -> listOf("Все дедлайны") + list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("Все дедлайны"))
 
-    fun onTitleChange(newTitle: String) { title = newTitle }
     fun onDescriptionChange(newDesc: String) { description = newDesc }
     fun onNewSubTaskTextChange(text: String) { newSubTaskText = text }
     fun setDeadlinePriority(value: Int) { priority = value }
@@ -66,19 +76,29 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
         _currentDeadlineId.value = id
 
         viewModelScope.launch {
-            repository.getDeadlineById(id).collect { deadline ->
-                deadline?.let {
-                    title = it.title
-                    description = it.description ?: ""
-                    endDate = it.endDate
-                    priority = it.priority
-                    isCompleted = it.isCompleted
+            if (id > 0) {
+                repository.getDeadlineById(id).collect { deadline ->
+                    deadline?.let {
+                        title = it.title
+                        description = it.description ?: ""
+                        endDate = it.endDate
+                        priority = it.priority
+                        isCompleted = it.isCompleted
+                    }
                 }
+            }else {
+                val activeCount = repository.getActiveDeadlinesCount()
+                title = "Дедлайн ${activeCount + 1}"
+
+                description = ""
+                endDate = System.currentTimeMillis() + 86400000
+                priority = 1
+                category = "Все дедлайны"
+                isCompleted = false
             }
         }
     }
 
-    // Быстрое переключение выполнения дедлайна из нижнего блока
     fun toggleDeadlineCompletion() {
         if (currentDeadlineId <= 0 && !isEditMode) return
         isCompleted = !isCompleted
@@ -93,6 +113,10 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
             )
             repository.updateDeadline(currentDeadline)
         }
+    }
+
+    fun onTitleChange(newTitle: String) {
+        title = newTitle
     }
 
     fun addSubTask() {
@@ -126,10 +150,12 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
     }
 
     fun saveDeadline(context: Context, onSuccess: () -> Unit) {
-        if (title.isBlank()) {
-            validationError = "Название задачи не может быть пустым!"
+        if (title.trim().isBlank()) {
+            validationError = "Название дедлайна не может быть пустым"
             return
         }
+
+        validationError = null
 
         val currentTime = System.currentTimeMillis()
         if (endDate < currentTime) {
@@ -141,12 +167,13 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
             validationError = null
 
             val deadline = Deadline(
-                id = if (isEditMode) currentDeadlineId else 0,
-                title = title,
+                id = if (currentDeadlineId > 0) currentDeadlineId else 0,
+                title = title.trim(),
                 description = description,
                 endDate = endDate,
                 priority = priority,
-                isCompleted = isCompleted,
+                category = category,
+                isCompleted = isCompleted
             )
 
             val savedId = if (isEditMode) {
@@ -155,6 +182,7 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
             } else {
                 repository.insertDeadline(deadline)
             }
+
 
             val workManager = WorkManager.getInstance(context)
 

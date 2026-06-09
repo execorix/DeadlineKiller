@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,8 +53,11 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -89,7 +96,7 @@ fun MainScreen(
     viewModel: MainViewModel,
     onAddDeadlineClick: () -> Unit,
     onDeadlineClick: (Int) -> Unit,
-    onNavigateToProfile: () -> Unit,
+    onNavigateToProfile: () -> Unit, // Оставляем для совместимости подписи сигнатуры в NavHost
     onNavigateToCompleted: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,307 +104,264 @@ fun MainScreen(
     val currentSortType by viewModel.sortType.collectAsState()
     val currentCategory by viewModel.selectedCategory.collectAsState()
 
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     var showSortMenu by remember { mutableStateOf(false) }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = SurfaceDark,
-                drawerContentColor = TextPrimary
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+    // Динамические категории из базы данных и состояние диалогового окна
+    val categoriesList by viewModel.categories.collectAsState()
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryInput by remember { mutableStateOf("") }
+
+    // Состояния для удаления категорий и задач
+    var categoryToDelete by remember { mutableStateOf<String?>(null) }
+    var showDeleteDeadlinesDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        containerColor = BackgroundDark,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark,
+                    titleContentColor = TextPrimary,
+                    navigationIconContentColor = TextPrimary
+                ),
+                title = {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (viewModel.isSelectionMode.value) {
+                            Text("Выбрано: ${viewModel.selectedDeadlineIds.size}", fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_logo),
+                                contentDescription = "Логотип",
+                                modifier = Modifier
+                                    .size(100.dp, 36.dp)
+                                    .align(Alignment.Center)
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (viewModel.isSelectionMode.value) {
+                        IconButton(onClick = { viewModel.toggleSelectionMode() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Закрыть")
+                        }
+                    } else {
+                        // Опциональная кнопка ручного входа в режим выделения (вместо старого гамбургера)
+                        IconButton(onClick = { viewModel.toggleSelectionMode() }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_checkbox),
+                                contentDescription = "Выбрать задачи",
+                                modifier = Modifier.size(22.dp),
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    if (viewModel.isSelectionMode.value && viewModel.selectedDeadlineIds.isNotEmpty()) {
+                        IconButton(onClick = { showDeleteDeadlinesDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Указать на удаление", tint = Color(0xFFEF4444))
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(48.dp))
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            if (!viewModel.isSelectionMode.value) {
+                FloatingActionButton(
+                    onClick = onAddDeadlineClick,
+                    containerColor = AccentPrimary,
+                    contentColor = Color.White,
+                    shape = CircleShape
                 ) {
-                    Column {
-                        Text(
-                            text = "Deadline Timer",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentPrimary,
-                            modifier = Modifier.padding(bottom = 24.dp)
-                        )
-                        HorizontalDivider(color = Color(0xFF2D2D34))
-
-                        NavigationDrawerItem(
-                            label = { Text("Выбрать задачи", color = TextPrimary) },
-                            selected = viewModel.isSelectionMode.value,
-                            onClick = {
-                                viewModel.toggleSelectionMode()
-                                scope.launch { drawerState.close() }
-                            },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                unselectedContainerColor = Color.Transparent,
-                                selectedContainerColor = AccentPrimary.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-
-                        NavigationDrawerItem(
-                            label = { Text("Выполненные дедлайны", color = TextPrimary) },
-                            selected = false,
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                onNavigateToCompleted()
-                            },
-                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-
-                        NavigationDrawerItem(
-                            label = { Text("Профиль и статистика", color = TextPrimary) },
-                            selected = false,
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                onNavigateToProfile()
-                            },
-                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "v1.0 • Kolbeshkin K.A.",
-                            fontSize = 12.sp,
-                            color = TextSecondary
-                        )
-                    }
+                    Text("+", fontSize = 26.sp, fontWeight = FontWeight.Light)
                 }
             }
         }
-    ) {
-        Scaffold(
-            containerColor = BackgroundDark,
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = BackgroundDark,
-                        titleContentColor = TextPrimary,
-                        navigationIconContentColor = TextPrimary
-                    ),
-                    title = {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            if (viewModel.isSelectionMode.value) {
-                                Text("Выбрано: ${viewModel.selectedDeadlineIds.size}", fontWeight = FontWeight.SemiBold)
-                            } else {
-                                // Добавляем ic_logo.png по центру как в макете image_373d82.png
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_logo),
-                                    contentDescription = "Логотип",
-                                    modifier = Modifier
-                                        .size(100.dp, 36.dp)
-                                        .align(Alignment.Center)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (!viewModel.isSelectionMode.value) {
+                // 1. Динамические категории дедлайнов (Скролл-бар сверху)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    categoriesList.forEach { category ->
+                        val isCatSelected = currentCategory == category
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isCatSelected) AccentPrimary.copy(alpha = 0.15f) else SurfaceDark)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isCatSelected) AccentPrimary else Color(0xFF2D2D34),
+                                    shape = RoundedCornerShape(10.dp)
                                 )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        if (viewModel.isSelectionMode.value) {
-                            IconButton(onClick = { viewModel.toggleSelectionMode() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Закрыть")
-                            }
-                        } else {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Меню")
-                            }
-                        }
-                    },
-                    actions = {
-                        if (viewModel.isSelectionMode.value && viewModel.selectedDeadlineIds.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.deleteSelectedDeadlines(deadlines) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = Color(0xFFEF4444))
-                            }
-                        } else {
-                            // Пустой Box справа для балансировки центрирования логотипы
-                            Spacer(modifier = Modifier.width(48.dp))
+                                .combinedClickable(
+                                    onClick = { viewModel.changeCategory(category) },
+                                    onLongClick = {
+                                        if (category != "Все дедлайны") {
+                                            categoryToDelete = category
+                                        }
+                                    }
+                                )
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = category,
+                                color = if (isCatSelected) AccentPrimary else TextSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
-                )
-            },
-            floatingActionButton = {
-                if (!viewModel.isSelectionMode.value) {
-                    FloatingActionButton(
-                        onClick = onAddDeadlineClick,
-                        containerColor = AccentPrimary,
-                        contentColor = Color.White,
-                        shape = CircleShape
+
+                    // Кнопка ПЛЮС для быстрого добавления кастомной категории
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceDark)
+                            .border(1.dp, Color(0xFF2D2D34), CircleShape)
+                            .clickable { showAddCategoryDialog = true },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("+", fontSize = 26.sp, fontWeight = FontWeight.Light)
+                        Text("+", color = AccentPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-            }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                if (!viewModel.isSelectionMode.value) {
-                    // 1. Категории дедлайнов (Верхний скролл-бар из макета)
+
+                // 2. Единая минималистичная выпадающая кнопка сортировки
+                val sortLabel = when (currentSortType) {
+                    DeadlineSortType.BY_DATE -> "по дате сдачи"
+                    DeadlineSortType.BY_PRIORITY -> "по важности"
+                    DeadlineSortType.BY_ALPHABET -> "по алфавиту"
+                }
+
+                Box(modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        val categories = listOf("Все дедлайны", "Категория 1", "Учеба", "Работа")
-                        categories.forEach { category ->
-                            val isCatSelected = currentCategory == category
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isCatSelected) AccentPrimary.copy(alpha = 0.15f) else SurfaceDark)
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isCatSelected) AccentPrimary else Color(0xFF2D2D34),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { viewModel.changeCategory(category) }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = category,
-                                    color = if (isCatSelected) AccentPrimary else TextSecondary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-
-                    // 2. Единая минималистичная выпадающая кнопка сортировки из макета
-                    val sortLabel = when (currentSortType) {
-                        DeadlineSortType.BY_DATE -> "по дате сдачи"
-                        DeadlineSortType.BY_PRIORITY -> "по важности"
-                        DeadlineSortType.BY_ALPHABET -> "по алфавиту"
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 24.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(SurfaceDark)
-                                .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
-                                .clickable { showSortMenu = true }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Сортировка: $sortLabel",
-                                color = TextPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text("▼", color = TextSecondary, fontSize = 10.sp)
-                        }
-
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false },
-                            modifier = Modifier
-                                .background(SurfaceDark)
-                                .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("По дате сдачи", color = TextPrimary) },
-                                onClick = {
-                                    viewModel.changeSortType(DeadlineSortType.BY_DATE)
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("По важности", color = TextPrimary) },
-                                onClick = {
-                                    viewModel.changeSortType(DeadlineSortType.BY_PRIORITY)
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("По алфавиту", color = TextPrimary) },
-                                onClick = {
-                                    viewModel.changeSortType(DeadlineSortType.BY_ALPHABET)
-                                    showSortMenu = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Список элементов
-                if (deadlines.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SurfaceDark)
+                            .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
+                            .clickable { showSortMenu = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Нет активных дедлайнов",
-                            fontSize = 15.sp,
-                            color = TextSecondary
+                            text = "Сортировка: $sortLabel",
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text("▼", color = TextSecondary, fontSize = 10.sp)
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        modifier = Modifier
+                            .background(SurfaceDark)
+                            .border(1.dp, Color(0xFF2D2D34), RoundedCornerShape(12.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("По дате сдачи", color = TextPrimary) },
+                            onClick = {
+                                viewModel.changeSortType(DeadlineSortType.BY_DATE)
+                                showSortMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("По важности", color = TextPrimary) },
+                            onClick = {
+                                viewModel.changeSortType(DeadlineSortType.BY_PRIORITY)
+                                showSortMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("По алфавиту", color = TextPrimary) },
+                            onClick = {
+                                viewModel.changeSortType(DeadlineSortType.BY_ALPHABET)
+                                showSortMenu = false
+                            }
                         )
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(deadlines, key = { it.id }) { deadline ->
-                            val isSelected = viewModel.selectedDeadlineIds.contains(deadline.id)
+                }
+            }
 
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                DeadlineItem(
-                                    deadline = deadline,
-                                    onClick = {
-                                        if (viewModel.isSelectionMode.value) {
-                                            viewModel.toggleDeadlineSelection(deadline.id)
-                                        } else {
-                                            onDeadlineClick(deadline.id)
-                                        }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Список элементов
+            if (deadlines.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Нет active дедлайнов",
+                        fontSize = 15.sp,
+                        color = TextSecondary
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(deadlines, key = { it.id }) { deadline ->
+                        val isSelected = viewModel.selectedDeadlineIds.contains(deadline.id)
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                        ) {
+                            DeadlineItem(
+                                deadline = deadline,
+                                onClick = {
+                                    if (viewModel.isSelectionMode.value) {
+                                        viewModel.toggleDeadlineSelection(deadline.id)
+                                    } else {
+                                        onDeadlineClick(deadline.id)
                                     }
-                                )
+                                }
+                            )
 
-                                // Наш кастомный чекбокс-ромбик/квадрат для режима выделения
-                                if (viewModel.isSelectionMode.value) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .padding(end = 16.dp)
-                                            .size(24.dp)
-                                            .border(
-                                                width = 1.5.dp,
-                                                color = if (isSelected) AccentPrimary else TextSecondary,
-                                                shape = RoundedCornerShape(6.dp)
-                                            )
-                                            .background(if (isSelected) AccentPrimary else Color.Transparent)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .clickable { viewModel.toggleDeadlineSelection(deadline.id) },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
+                            // Наш кастомный чекбокс-ромбик/квадрат для режима выделения
+                            if (viewModel.isSelectionMode.value) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 16.dp)
+                                        .size(24.dp)
+                                        .border(
+                                            width = 1.5.dp,
+                                            color = if (isSelected) AccentPrimary else TextSecondary,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .background(if (isSelected) AccentPrimary else Color.Transparent)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { viewModel.toggleDeadlineSelection(deadline.id) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -406,6 +370,109 @@ fun MainScreen(
                 }
             }
         }
+    }
+
+    // ДИАЛОГОВОЕ ОКНО СОЗДАНИЯ СВОЕЙ КАТЕГОРИИ
+    if (showAddCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAddCategoryDialog = false
+                newCategoryInput = ""
+            },
+            containerColor = SurfaceDark,
+            titleContentColor = TextPrimary,
+            title = { Text("Создать категорию", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryInput,
+                    onValueChange = { newCategoryInput = it },
+                    label = { Text("Название категории") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentPrimary,
+                        unfocusedBorderColor = Color(0xFF2D2D34),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = AccentPrimary,
+                        unfocusedLabelColor = TextSecondary
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newCategoryInput.isNotBlank()) {
+                            viewModel.addCategory(newCategoryInput)
+                            showAddCategoryDialog = false
+                            newCategoryInput = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
+                ) { Text("Добавить") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showAddCategoryDialog = false
+                    newCategoryInput = ""
+                }) { Text("Отмена", color = TextSecondary) }
+            }
+        )
+    }
+
+    // ДИАЛОГОВОЕ ОКНО ДЛЯ ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ КАТЕГОРИИ
+    if (categoryToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { categoryToDelete = null },
+            containerColor = SurfaceDark,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = { Text("Удалить категорию?", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = { Text("Категория \"$categoryToDelete\" будет полностью удалена. Все связанные с ней задачи будут перенесены в категорию \"Все дедлайны\".") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        categoryToDelete?.let { viewModel.deleteCategory(it) }
+                        categoryToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) { Text("Удалить", color = Color.White) }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToDelete = null }) {
+                    Text("Отмена", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    // ДИАЛОГОВОЕ ОКНО ДЛЯ МНОЖЕСТВЕННОГО УДАЛЕНИЯ ЗАДАЧ
+    if (showDeleteDeadlinesDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDeadlinesDialog = false },
+            containerColor = SurfaceDark,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = { Text("Удалить задачи?", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = { Text("Вы действительно хотите удалить выбранные дедлайны (${viewModel.selectedDeadlineIds.size} шт.)?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteSelectedDeadlines(deadlines)
+                        viewModel.toggleSelectionMode() // Выходим из режима выделения после удаления
+                        showDeleteDeadlinesDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("Удалить", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDeadlinesDialog = false }) {
+                    Text("Отмена", color = TextSecondary)
+                }
+            }
+        )
     }
 }
 
@@ -416,11 +483,10 @@ fun DeadlineItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Неоновые цвета границ по важности (Вместо бьющих по глазам фонов)
     val borderColor = when (deadline.priority) {
-        3 -> Color(0xFFEF4444) // Высокая - Красный
-        2 -> Color(0xFFFBBF24) // Средняя - Желтый
-        else -> Color(0xFF10B981) // Низкая - Зеленый
+        3 -> Color(0xFFEF4444)
+        2 -> Color(0xFFFBBF24)
+        else -> Color(0xFF10B981)
     }
 
     val priorityText = when (deadline.priority) {
@@ -445,7 +511,6 @@ fun DeadlineItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Имя дедлайна
                 Text(
                     text = deadline.title,
                     fontSize = 17.sp,
@@ -454,7 +519,6 @@ fun DeadlineItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Метка важности со своим индикатором-цветом
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(start = 8.dp)
@@ -476,7 +540,6 @@ fun DeadlineItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Время контента
             Text(
                 text = formatRemainingTime(deadline.endDate),
                 fontSize = 13.sp,

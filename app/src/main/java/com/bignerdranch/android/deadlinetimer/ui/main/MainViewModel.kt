@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.collections.filter
@@ -28,24 +30,21 @@ class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
 
     val sortType = MutableStateFlow(DeadlineSortType.BY_DATE)
 
-    // Текущая выбранная категория (пока заглушка для верстки)
-    val selectedCategory = MutableStateFlow("Все дедлайны")
+    private val _selectedCategory = MutableStateFlow("Все дедлайны")
+    val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    // Фильтруем только НЕвыполненные дедлайны и сортируем их
+
     val deadlines: StateFlow<List<Deadline>> = combine(
         deadlinesFlow,
         sortType,
         selectedCategory // Наш MutableStateFlow("Все дедлайны")
     ) { deadlinesList, type, category ->
-        // Сначала отсекаем выполненные
         var filteredList = deadlinesList.filter { !it.isCompleted }
 
-        // Затем фильтруем по выбранной категории (если выбрано не "Все дедлайны")
         if (category != "Все дедлайны") {
             filteredList = filteredList.filter { it.category == category }
         }
 
-        // В конце применяем сортировку
         when (type) {
             DeadlineSortType.BY_DATE -> filteredList.sortedBy { it.endDate }
             DeadlineSortType.BY_PRIORITY -> filteredList.sortedByDescending { it.priority }
@@ -57,12 +56,30 @@ class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
         initialValue = emptyList()
     )
 
+    val categories: StateFlow<List<String>> = repository.allCategories
+        .map { categoryList ->
+            listOf("Все дедлайны") + categoryList.map { it.name }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = listOf("Все дедлайны")
+        )
+
+    fun addCategory(name: String) {
+        if (name.isNotBlank()) {
+            viewModelScope.launch {
+                repository.insertCategory(com.bignerdranch.android.deadlinetimer.data.local.entities.Category(name.trim()))
+            }
+        }
+    }
+
     fun changeSortType(type: DeadlineSortType) {
         sortType.value = type
     }
 
     fun changeCategory(category: String) {
-        selectedCategory.value = category
+        _selectedCategory.value = category
     }
 
     fun toggleSelectionMode() {
@@ -77,6 +94,15 @@ class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
             selectedDeadlineIds.remove(id)
         } else {
             selectedDeadlineIds.add(id)
+        }
+    }
+
+    fun deleteCategory(categoryName: String) {
+        viewModelScope.launch {
+            repository.deleteCategoryAndResetDeadlines(categoryName)
+            if (_selectedCategory.value == categoryName) {
+                _selectedCategory.value = "Все дедлайны"
+            }
         }
     }
 

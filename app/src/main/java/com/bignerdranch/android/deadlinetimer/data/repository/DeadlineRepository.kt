@@ -1,13 +1,20 @@
 package com.bignerdranch.android.deadlinetimer.data.repository
 
 import DeadlineDao
+import com.bignerdranch.android.deadlinetimer.data.local.entities.Category
 import com.bignerdranch.android.deadlinetimer.data.local.entities.Deadline
 import com.bignerdranch.android.deadlinetimer.data.local.entities.SubTask
+import com.bignerdranch.android.deadlinetimer.ui.profile.ProfileStats
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class DeadlineRepository(private val deadlineDao: DeadlineDao) {
 
+    val allCategories: Flow<List<Category>> = deadlineDao.getAllCategories()
 
+    suspend fun insertCategory(category: Category) {
+        deadlineDao.insertCategory(category)
+    }
     val allDeadline: Flow<List<Deadline>> = deadlineDao.getAllDeadlines()
 
     fun getDeadlineById(id: Int): Flow<Deadline?>{
@@ -29,10 +36,39 @@ class DeadlineRepository(private val deadlineDao: DeadlineDao) {
     suspend fun resetIdSequence() {
         deadlineDao.resetIdSequence()
     }
+    fun getStatsFlow(): Flow<ProfileStats> {
+        return deadlineDao.getAllDeadlines() // Твой метод Dao/хранилища, который возвращает Flow списка дедлайнов
+            .map { deadlines ->
+                val completed = deadlines.count { it.isCompleted }
+                val active = deadlines.count { !it.isCompleted }
+                val total = completed + active
+
+                val percentage = if (total > 0) {
+                    (completed.toFloat() / total.toFloat()) * 100f
+                } else {
+                    0f
+                }
+
+                // Возвращаем объект статистики для экрана профиля
+                ProfileStats(
+                    completedCount = completed,
+                    activeCount = active,
+                    completedPercentage = percentage
+                )
+            }
+    }
 
     suspend fun getDeadlinesCount(): Int {
         return deadlineDao.getDeadlinesCount()
     }
+
+    suspend fun getActiveDeadlinesCount(): Int {
+        return deadlineDao.getActiveDeadlinesCount()
+    }
+    suspend fun deleteCategoryAndResetDeadlines(categoryName: String) {
+        deadlineDao.deleteCategoryAndResetDeadlines(categoryName)
+    }
+
 
     fun getSubTasks(deadlineId: Int): Flow<List<SubTask>> = deadlineDao.getSubTasksForDeadline(deadlineId)
     suspend fun insertSubTask(subTask: SubTask) = deadlineDao.insertSubTask(subTask)

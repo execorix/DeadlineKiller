@@ -98,14 +98,13 @@ fun DetailsScreen(
     var showPriorityMenu by remember { mutableStateOf(false) }
     var showCategoryMenu by remember { mutableStateOf(false) } // Меню выбора категорий
 
-    // Временные буферы для ввода в диалогах
     var inputTitle by remember { mutableStateOf("") }
 
     val formatter = remember { SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale.getDefault()) }
     val calendar = remember { Calendar.getInstance() }
 
-    // Список доступных категорий в приложении
-    val availableCategories = listOf("Все дедлайны", "Категория 1", "Учеба", "Работа")
+
+    val availableCategories by viewModel.availableCategories.collectAsState()
 
     val timePickerDialog = remember {
         TimePickerDialog(
@@ -205,16 +204,15 @@ fun DetailsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    StyleMinimalButton(text = "изменить срок") {
+                    StyleMinimalButton(text = "Изменить срок") {
                         showDatePicker = true
                     }
 
-                    StyleMinimalButton(text = "изменить имя") {
+                    StyleMinimalButton(text = "Изменить имя") {
                         inputTitle = viewModel.title
                         showNameDialog = true
                     }
 
-                    // Кнопка изменения важности (срочности)
                     val currentPriorityLabel = when(viewModel.priority) {
                         1 -> "Низкая"
                         2 -> "Средняя"
@@ -222,7 +220,7 @@ fun DetailsScreen(
                         else -> "Низкая"
                     }
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        StyleMinimalButton(text = "изменить срочность ($currentPriorityLabel)") {
+                        StyleMinimalButton(text = "Изменить срочность ($currentPriorityLabel)") {
                             showPriorityMenu = true
                         }
                         DropdownMenu(
@@ -246,7 +244,7 @@ fun DetailsScreen(
 
                     // НОВАЯ КНОПКА: Управление категориями
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        StyleMinimalButton(text = "изменить категорию (${viewModel.category})") {
+                        StyleMinimalButton(text = "Изменить категорию (${viewModel.category})") {
                             showCategoryMenu = true
                         }
                         DropdownMenu(

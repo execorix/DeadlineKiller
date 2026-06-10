@@ -109,10 +109,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Проверяем авторизацию до запуска Compose-интерфейса, чтобы избежать рекомпозиционного краша
         val isUserRegistered = securePrefs.getString("user_name", null) != null
 
-        // Запрос разрешений на уведомления для Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -131,15 +129,12 @@ class MainActivity : ComponentActivity() {
                     color = BackgroundDark
                 ) {
                     val navController = rememberNavController()
-
-                    // Отслеживаем текущий открытый экран
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
 
                     Scaffold(
                         containerColor = BackgroundDark,
                         bottomBar = {
-                            // Показывать нижнюю панель только на трех главных экранах (прячем на экране auth)
                             val mainRoutes = listOf("main_screen", "profile_screen", "completed")
                             if (currentRoute in mainRoutes) {
                                 Row(
@@ -150,7 +145,6 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 1. Иконка Профиля (Человек)
                                     Box(
                                         modifier = Modifier
                                             .size(48.dp)
@@ -197,8 +191,6 @@ class MainActivity : ComponentActivity() {
                                                 androidx.compose.ui.graphics.ColorFilter.tint(AccentPrimary) else null
                                         )
                                     }
-
-                                    // 3. Иконка Выполненных задач (Чекбокс)
                                     Box(
                                         modifier = Modifier
                                             .size(48.dp)
@@ -231,21 +223,16 @@ class MainActivity : ComponentActivity() {
                             startDestination = if (isUserRegistered) "main_screen" else "auth_screen",
                             modifier = Modifier.padding(paddingValues)
                         ) {
-                            // 0. Экран авторизации и надежной регистрации
                             composable(route = "auth_screen") {
                                 AuthScreen(
                                     onAuthSuccess = { login, email, password ->
-                                        // Хешируем пароль с помощью BCrypt перед записью в память
                                         val hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt(12))
-
                                         securePrefs.edit().apply {
                                             putString("user_name", login)
                                             putString("user_email", email)
                                             putString("user_password", hashedPassword)
                                             apply()
                                         }
-
-                                        // Переходим на главный экран и полностью очищаем экран авторизации из бэкстека
                                         navController.navigate("main_screen") {
                                             popUpTo("auth_screen") { inclusive = true }
                                         }
@@ -253,7 +240,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // 1. Главный экран дедлайнов
                             composable(route = "main_screen") {
                                 val mainViewModel: MainViewModel = viewModel(
                                     factory = object : ViewModelProvider.Factory {
@@ -277,7 +263,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // 2. Экран деталей / добавления дедлайна
                             composable(
                                 route = "details_screen/{deadlineId}",
                                 arguments = listOf(
@@ -305,7 +290,6 @@ class MainActivity : ComponentActivity() {
 
                             }
 
-                            // 3. Экран профиля и статистики
                             composable(route = "profile_screen") {
                                 val profileViewModel: ProfileViewModel = viewModel(
                                     factory = object : ViewModelProvider.Factory {
@@ -339,13 +323,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                                 SettingsScreen(
-                                    viewModel = profileViewModel, // Передаем ту же самую вьюмодель
+                                    viewModel = profileViewModel,
                                     securePrefs = securePrefs,
                                     onNavigateBack = { navController.popBackStack() }
                                 )
                             }
 
-                            // 4. Экран выполненных дедлайнов
                             composable(route = "completed") {
                                 val completedViewModel: CompletedViewModel = viewModel(
                                     factory = object : ViewModelProvider.Factory {

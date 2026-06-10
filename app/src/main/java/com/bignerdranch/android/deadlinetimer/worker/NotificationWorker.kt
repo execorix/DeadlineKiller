@@ -37,11 +37,10 @@ class NotificationWorker(
             notificationManager.createNotificationChannel(channel)
         }
 
-        // Строим само уведомление
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
             .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // Временная стандартная иконка будильника
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()

@@ -138,7 +138,6 @@ fun CompletedDeadlineItem(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Кнопка восстановления дедлайна обратно в активные
             IconButton(onClick = onRestore) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -147,7 +146,6 @@ fun CompletedDeadlineItem(
                 )
             }
 
-            // Кнопка полног
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,

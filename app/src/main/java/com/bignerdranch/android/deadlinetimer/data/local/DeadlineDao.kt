@@ -64,7 +64,6 @@ interface DeadlineDao {
     @Query("DELETE FROM categories WHERE name = :categoryName")
     suspend fun deleteCategoryByName(categoryName: String)
 
-    // Объединяем оба действия в безопасную транзакцию
     @Transaction
     suspend fun deleteCategoryAndResetDeadlines(categoryName: String) {
         resetDeadlinesCategory(categoryName)

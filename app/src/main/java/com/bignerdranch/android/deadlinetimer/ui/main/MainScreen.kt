@@ -96,25 +96,20 @@ fun MainScreen(
     viewModel: MainViewModel,
     onAddDeadlineClick: () -> Unit,
     onDeadlineClick: (Int) -> Unit,
-    onNavigateToProfile: () -> Unit, // Оставляем для совместимости подписи сигнатуры в NavHost
+    onNavigateToProfile: () -> Unit,
     onNavigateToCompleted: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val deadlines by viewModel.deadlines.collectAsState()
     val currentSortType by viewModel.sortType.collectAsState()
     val currentCategory by viewModel.selectedCategory.collectAsState()
-
     var showSortMenu by remember { mutableStateOf(false) }
-
-    // Динамические категории из базы данных и состояние диалогового окна
     val categoriesList by viewModel.categories.collectAsState()
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryInput by remember { mutableStateOf("") }
-
-    // Состояния для удаления категорий и задач
     var categoryToDelete by remember { mutableStateOf<String?>(null) }
     var showDeleteDeadlinesDialog by remember { mutableStateOf(false) }
-
+    
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -145,7 +140,6 @@ fun MainScreen(
                             Icon(Icons.Default.Close, contentDescription = "Закрыть")
                         }
                     } else {
-                        // Опциональная кнопка ручного входа в режим выделения (вместо старого гамбургера)
                         IconButton(onClick = { viewModel.toggleSelectionMode() }) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_checkbox),
@@ -186,7 +180,6 @@ fun MainScreen(
                 .padding(paddingValues)
         ) {
             if (!viewModel.isSelectionMode.value) {
-                // 1. Динамические категории дедлайнов (Скролл-бар сверху)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -225,7 +218,6 @@ fun MainScreen(
                         }
                     }
 
-                    // Кнопка ПЛЮС для быстрого добавления кастомной категории
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -239,7 +231,6 @@ fun MainScreen(
                     }
                 }
 
-                // 2. Единая минималистичная выпадающая кнопка сортировки
                 val sortLabel = when (currentSortType) {
                     DeadlineSortType.BY_DATE -> "по дате сдачи"
                     DeadlineSortType.BY_PRIORITY -> "по важности"
@@ -338,7 +329,6 @@ fun MainScreen(
                                 }
                             )
 
-                            // Наш кастомный чекбокс-ромбик/квадрат для режима выделения
                             if (viewModel.isSelectionMode.value) {
                                 Box(
                                     modifier = Modifier
@@ -372,7 +362,6 @@ fun MainScreen(
         }
     }
 
-    // ДИАЛОГОВОЕ ОКНО СОЗДАНИЯ СВОЕЙ КАТЕГОРИИ
     if (showAddCategoryDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -420,7 +409,6 @@ fun MainScreen(
         )
     }
 
-    // ДИАЛОГОВОЕ ОКНО ДЛЯ ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ КАТЕГОРИИ
     if (categoryToDelete != null) {
         AlertDialog(
             onDismissRequest = { categoryToDelete = null },
@@ -446,7 +434,6 @@ fun MainScreen(
         )
     }
 
-    // ДИАЛОГОВОЕ ОКНО ДЛЯ МНОЖЕСТВЕННОГО УДАЛЕНИЯ ЗАДАЧ
     if (showDeleteDeadlinesDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDeadlinesDialog = false },
@@ -459,7 +446,7 @@ fun MainScreen(
                 Button(
                     onClick = {
                         viewModel.deleteSelectedDeadlines(deadlines)
-                        viewModel.toggleSelectionMode() // Выходим из режима выделения после удаления
+                        viewModel.toggleSelectionMode()
                         showDeleteDeadlinesDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))

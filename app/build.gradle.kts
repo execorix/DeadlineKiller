@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    alias(libs.plugins.hiltAndroid)
+    alias(libs.plugins.kotlinKsp)
 }
 
 android {
@@ -52,6 +54,13 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.foundation)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.0")
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
     kapt("androidx.room:room-compiler:2.7.0")
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

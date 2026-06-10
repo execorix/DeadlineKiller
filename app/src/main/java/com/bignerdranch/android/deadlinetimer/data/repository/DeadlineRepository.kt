@@ -37,7 +37,7 @@ class DeadlineRepository(private val deadlineDao: DeadlineDao) {
         deadlineDao.resetIdSequence()
     }
     fun getStatsFlow(): Flow<ProfileStats> {
-        return deadlineDao.getAllDeadlines() // Твой метод Dao/хранилища, который возвращает Flow списка дедлайнов
+        return deadlineDao.getAllDeadlines()
             .map { deadlines ->
                 val completed = deadlines.count { it.isCompleted }
                 val active = deadlines.count { !it.isCompleted }
@@ -48,8 +48,6 @@ class DeadlineRepository(private val deadlineDao: DeadlineDao) {
                 } else {
                     0f
                 }
-
-                // Возвращаем объект статистики для экрана профиля
                 ProfileStats(
                     completedCount = completed,
                     activeCount = active,

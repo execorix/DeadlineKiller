@@ -165,7 +165,6 @@ fun ProfileScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // АВАТАРКА ПРОФИЛЯ
             Box(
                 modifier = Modifier
                     .size(124.dp)
@@ -205,12 +204,11 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // БЛОК ИМЕНИ И ПОЧТЫ (Клик теперь переносит в полноценные настройки)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { onNavigateToSettings() } // Просто открываем экран настроек
+                    .clickable { onNavigateToSettings() }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Row(
@@ -243,7 +241,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // КАРТОЧКА СТАТИСТИКИ (Твой Pie Chart)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

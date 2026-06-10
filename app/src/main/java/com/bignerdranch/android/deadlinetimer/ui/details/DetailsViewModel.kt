@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.lang.Thread.sleep
 import java.util.concurrent.TimeUnit
 
 class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel() {
@@ -89,9 +90,8 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
             }else {
                 val activeCount = repository.getActiveDeadlinesCount()
                 title = "Дедлайн ${activeCount + 1}"
-
                 description = ""
-                endDate = System.currentTimeMillis() + 86400000
+                endDate = System.currentTimeMillis()
                 priority = 1
                 category = "Все дедлайны"
                 isCompleted = false
@@ -151,16 +151,14 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
 
     fun saveDeadline(context: Context, onSuccess: () -> Unit) {
         if (title.trim().isBlank()) {
-            validationError = "Название дедлайна не может быть пустым"
-            return
+            title = "Unnamed Deadline"
         }
 
         validationError = null
 
         val currentTime = System.currentTimeMillis()
-        if (endDate < currentTime) {
-            validationError = "Нельзя установить дедлайн на прошедшее время!"
-            return
+        if (endDate < currentTime && !isCompleted) {
+            endDate = currentTime + 603000
         }
 
         viewModelScope.launch {
@@ -198,6 +196,7 @@ class DetailsViewModel(private val repository: DeadlineRepository) : ViewModel()
                 TimeUnit.HOURS.toMillis(6) to "Осталось 6 часов до дедлайна!",
                 TimeUnit.HOURS.toMillis(1) to "Остался 1 час до дедлайна!",
                 TimeUnit.MINUTES.toMillis(30) to "Осталось полчаса до конца дедлайна!",
+                TimeUnit.MINUTES.toMillis(10) to "Осталось 10 минут до конца дедлайна!",
                 0L to "Время истекло! Дедлайн гори-и-ит!"
             )
 

@@ -71,7 +71,6 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Подтягиваем текущие данные пользователя для отображения по умолчанию
     val currentName = remember { securePrefs.getString("user_name", "") ?: "" }
     val currentEmail = remember { securePrefs.getString("user_email", "") ?: "" }
     var newName by remember { mutableStateOf(currentName) }
@@ -88,7 +87,6 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         uri?.let {
             selectedImageUri = it
-            // Вызываем метод вьюмодели, который скопирует файл и обновит StateFlow!
             viewModel.updateProfile(context, newName, it)
         }
     }
@@ -98,8 +96,6 @@ fun SettingsScreen(
     var newEmail by remember { mutableStateOf(currentEmail) }
     var newPassword by remember { mutableStateOf("") }
     var passwordConfirmForEmailChange by remember { mutableStateOf("") }
-
-    // Переменная для управления размером аватарки (как просил на схеме)
     var avatarSizeMultiplier by remember { mutableStateOf(120f) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -131,23 +127,21 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp)
-                .verticalScroll(rememberScrollState()), // Чтобы экран можно было скроллить при открытии клавиатуры
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 1. АВАТАРКА С ИЗМЕНЕНИЕМ РАЗМЕРА (Реализация схемы image_26e7a9.png)
             Box(
                 modifier = Modifier
                     .size(avatarSizeMultiplier.dp)
                     .clip(CircleShape)
                     .background(SurfaceDark)
                     .border(2.dp, AccentPrimary, CircleShape)
-                    .clickable { galleryLauncher.launch("image/*") }, // Клик по самой аватарке тоже откроет галерею
+                    .clickable { galleryLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
                 if (selectedImageUri != null) {
-                    // Если пользователь выбрал фото — отображаем его через Coil
                     Image(
                         painter = rememberAsyncImagePainter(model = selectedImageUri),
                         contentDescription = "Аватарка",
@@ -155,7 +149,6 @@ fun SettingsScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Если фото нет — показываем дефолтного человечка
                     Image(
                         painter = painterResource(id = R.drawable.ic_person),
                         contentDescription = "Аватарка по умолчанию",
@@ -175,13 +168,11 @@ fun SettingsScreen(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable {
-                        // Запускаем системное окно выбора файлов/фотографий
                         galleryLauncher.launch("image/*")
                     }
                     .padding(8.dp)
             )
 
-            // Ползунок изменения размера фотографии аватарки
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -202,7 +193,6 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 2. ПОЛЯ РЕДАКТИРОВАНИЯ ИМЕНИ
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it; errorMessage = null; successMessage = null },
@@ -217,7 +207,6 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3. ПОЛЯ РЕДАКТИРОВАНИЯ ПОЧТЫ
             OutlinedTextField(
                 value = newEmail,
                 onValueChange = { newEmail = it; errorMessage = null; successMessage = null },
@@ -232,8 +221,6 @@ fun SettingsScreen(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // ПОЛЕ ДЛЯ ВВОДА ТЕКУЩЕГО ПАРОЛЯ (Обязательно для смены почты)
             OutlinedTextField(
                 value = passwordConfirmForEmailChange,
                 onValueChange = { passwordConfirmForEmailChange = it; errorMessage = null; successMessage = null },
@@ -249,8 +236,6 @@ fun SettingsScreen(
             )
 
             Spacer(modifier = Modifier.height(14.dp))
-
-            // 4. ПОЛЕ ДЛЯ НОВОГО ПАРОЛЯ (Если пользователь хочет обновить и его)
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = { newPassword = it; errorMessage = null; successMessage = null },
@@ -264,8 +249,6 @@ fun SettingsScreen(
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
-
-            // Вывод уведомлений об ошибках/успехе
             if (errorMessage != null) {
                 Text(text = errorMessage!!, color = Color(0xFFEF4444), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
             }
@@ -274,25 +257,20 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(28.dp))
-
-            // КНОПКА СОХРАНЕНИЯ
             Button(
                 onClick = {
                     val savedPasswordHash = securePrefs.getString("user_password", "") ?: ""
 
-                    // 1. Валидация формата почты
                     if (!Patterns.EMAIL_ADDRESS.matcher(newEmail).matches()) {
                         errorMessage = "Некорректный формат почты"
                         return@Button
                     }
 
-                    // 2. Если имя изменилось
                     if (newName.isBlank()) {
                         errorMessage = "Имя пользователя не может быть пустым"
                         return@Button
                     }
 
-                    // 3. Защита: Если почта была изменена, требуем пароль
                     if (newEmail != currentEmail) {
                         if (passwordConfirmForEmailChange.isBlank()) {
                             errorMessage = "Для изменения почты необходимо ввести текущий пароль"
@@ -304,7 +282,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 4. Валидация и хэширование нового пароля (если его ввели)
                     var updatedPasswordHash = savedPasswordHash
                     if (newPassword.isNotBlank()) {
                         if (newPassword.length < 8) {
@@ -314,7 +291,6 @@ fun SettingsScreen(
                         updatedPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt(12))
                     }
 
-                    // Запись обновленных данных в зашифрованное хранилище
                     securePrefs.edit().apply {
                         putString("user_name", newName)
                         putString("user_email", newEmail)

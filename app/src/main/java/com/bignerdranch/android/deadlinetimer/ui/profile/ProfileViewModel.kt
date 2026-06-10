@@ -30,7 +30,6 @@ class ProfileViewModel(
     private val context: Context
 ) : ViewModel() {
 
-    // Инициализируем хранилище прямо внутри ViewModel для чистоты работы с данными
     private val securePrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -44,7 +43,6 @@ class ProfileViewModel(
         )
     }
 
-    // Считываем сохраненные при регистрации / редактировании данные
     private val _userName = MutableStateFlow(securePrefs.getString("user_name", "Имя пользователя") ?: "Имя пользователя")
     val userName: StateFlow<String> = _userName.asStateFlow()
 
@@ -54,7 +52,6 @@ class ProfileViewModel(
     private val _avatarUri = MutableStateFlow(securePrefs.getString("user_avatar_uri", null))
     val avatarUri: StateFlow<String?> = _avatarUri.asStateFlow()
 
-    // Стейт для статистики дедлайнов (подстрой под свой класс Stats)
     private val _statsFlow = MutableStateFlow(ProfileStats())
     val statsFlow: StateFlow<ProfileStats> = _statsFlow.asStateFlow()
 

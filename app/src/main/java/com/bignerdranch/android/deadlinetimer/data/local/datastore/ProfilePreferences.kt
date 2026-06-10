@@ -4,32 +4,40 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "profile_prefs")
-
 class ProfilePreferences(private val context: Context) {
 
-    companion object {
-        val USER_NAME_KEY = stringPreferencesKey("user_name")
-        val AVATAR_URI_KEY = stringPreferencesKey("avatar_uri")
-    }
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
 
-    val userNameFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[USER_NAME_KEY] ?: "Имя пользователя"
-    }
+    private val securePrefs = EncryptedSharedPreferences.create(
+        context,
+        "secure_user_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
-    val avatarUriFlow: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[AVATAR_URI_KEY]
-    }
+    fun getUserName(): String = securePrefs.getString("user_name", "Имя пользователя") ?: "Имя пользователя"
 
-    suspend fun saveProfile(name: String, avatarUri: String?) {
-        context.dataStore.edit { prefs ->
-            prefs[USER_NAME_KEY] = name
-            if (avatarUri != null) {
-                prefs[AVATAR_URI_KEY] = avatarUri
-            }
+    fun saveAccountData(name: String, email: String) {
+        securePrefs.edit().apply {
+            putString("user_name", name)
+            putString("user_email", email)
+            apply()
         }
     }
+    fun getUserEmail(): String = securePrefs.getString("user_email", "example@mail.ru") ?: "example@mail.ru"
+
+    fun saveAvatarPath(path: String) {
+        securePrefs.edit().putString("user_avatar_uri", path).apply()
+    }
+
+    fun getAvatarPath(): String? = securePrefs.getString("user_avatar_uri", null)
 }

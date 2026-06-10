@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CompletedViewModel(private val repository: DeadlineRepository) : ViewModel() {
-
-    // Получаем только выполненные дедлайны
     val completedDeadlines: StateFlow<List<Deadline>> = repository.allDeadline
         .map { deadlines -> deadlines.filter { it.isCompleted } }
         .stateIn(
@@ -20,13 +18,11 @@ class CompletedViewModel(private val repository: DeadlineRepository) : ViewModel
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
-
     fun restoreDeadline(deadline: Deadline) {
         viewModelScope.launch {
             repository.updateDeadline(deadline.copy(isCompleted = false))
         }
     }
-
     fun deleteDeadline(deadline: Deadline) {
         viewModelScope.launch {
             repository.deleteDeadline(deadline)

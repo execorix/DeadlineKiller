@@ -92,11 +92,10 @@ fun DetailsScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Состояния для показа диалогов и выпадающих меню
     var showDatePicker by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
     var showPriorityMenu by remember { mutableStateOf(false) }
-    var showCategoryMenu by remember { mutableStateOf(false) } // Меню выбора категорий
+    var showCategoryMenu by remember { mutableStateOf(false) }
 
     var inputTitle by remember { mutableStateOf("") }
 
@@ -156,11 +155,10 @@ fun DetailsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
-                    .padding(bottom = 100.dp) // Отступ снизу под фиксированную кнопку выполнения
+                    .padding(bottom = 100.dp)
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Ошибка валидации
                 viewModel.validationError?.let { errorText ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF3A1C1C)),
@@ -171,7 +169,6 @@ fun DetailsScreen(
                     }
                 }
 
-                // Блок скругленного описания
                 Text("Описание:", color = TextSecondary, fontSize = 14.sp)
                 OutlinedTextField(
                     value = viewModel.description,
@@ -189,8 +186,6 @@ fun DetailsScreen(
                         unfocusedLabelColor = TextSecondary
                     )
                 )
-
-                // Текстовый вывод срока сдачи
                 Text(
                     text = "Срок: до ${formatter.format(Date(viewModel.endDate))}",
                     color = TextPrimary,
@@ -199,7 +194,6 @@ fun DetailsScreen(
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // Раздел минималистичных кнопок управления параметрами
                 Column(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -242,7 +236,6 @@ fun DetailsScreen(
                         }
                     }
 
-                    // НОВАЯ КНОПКА: Управление категориями
                     Box(modifier = Modifier.fillMaxWidth()) {
                         StyleMinimalButton(text = "Изменить категорию (${viewModel.category})") {
                             showCategoryMenu = true
@@ -258,7 +251,7 @@ fun DetailsScreen(
                                 DropdownMenuItem(
                                     text = { Text(cat, color = TextPrimary) },
                                     onClick = {
-                                        viewModel.onCategoryChange(cat) // Записываем категорию в дедлайн
+                                        viewModel.onCategoryChange(cat)
                                         showCategoryMenu = false
                                     }
                                 )
@@ -267,7 +260,6 @@ fun DetailsScreen(
                     }
                 }
 
-                // Раздел подзадач (Сабтасков)
                 if (deadlineId > 0) {
                     val subTasks by viewModel.subTasksFlow.collectAsState(initial = emptyList())
 
@@ -296,7 +288,6 @@ fun DetailsScreen(
                             )
                         )
 
-                        // Минималистичная кнопка "+" добавления сабтаска
                         Box(
                             modifier = Modifier
                                 .size(50.dp)
@@ -309,7 +300,6 @@ fun DetailsScreen(
                         }
                     }
 
-                    // Список добавленных подзадач
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -323,7 +313,6 @@ fun DetailsScreen(
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Ромбовидный или квадратный кастомный чекбокс из макета
                                 Box(
                                     modifier = Modifier
                                         .size(24.dp)
@@ -369,7 +358,6 @@ fun DetailsScreen(
                 }
             }
 
-            // Отдельный фиксированный блок закрытия задачи (Под всеми элементами)
             if (deadlineId > 0) {
                 Box(
                     modifier = Modifier
@@ -422,7 +410,6 @@ fun DetailsScreen(
         }
     }
 
-    // Диалог изменения названия («изменить имя»)
     if (showNameDialog) {
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
@@ -458,7 +445,6 @@ fun DetailsScreen(
         )
     }
 
-    // Календарь («изменить срок»)
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = viewModel.endDate)
 

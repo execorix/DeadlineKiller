@@ -109,7 +109,7 @@ fun AuthScreen(
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(14.dp)) // Исправлено: добавлена закрывающая скобка
+            Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedTextField(
                 value = password,

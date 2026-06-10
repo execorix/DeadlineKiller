@@ -37,7 +37,7 @@ class MainViewModel(private val repository: DeadlineRepository) : ViewModel() {
     val deadlines: StateFlow<List<Deadline>> = combine(
         deadlinesFlow,
         sortType,
-        selectedCategory // Наш MutableStateFlow("Все дедлайны")
+        selectedCategory
     ) { deadlinesList, type, category ->
         var filteredList = deadlinesList.filter { !it.isCompleted }
 

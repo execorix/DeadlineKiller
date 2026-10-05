@@ -196,11 +196,6 @@ app/src/main/java/com/bignerdranch/android/deadlinetimer/
 
 ---
 
-## 📄 Лицензия
-
-Проект распространяется под лицензией [MIT](LICENSE).
-
----
 
 <p align="center">
   Разработано с ❤️ автором <a href="https://github.com/execorix">@execorix</a>

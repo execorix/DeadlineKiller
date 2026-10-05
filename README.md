@@ -1,3 +1,4 @@
+DeadlineKiller
 ⏰ DeadlineKiller
 Android-приложение для тех, у кого всегда есть дедлайны — и всегда не хватает времени.
 
